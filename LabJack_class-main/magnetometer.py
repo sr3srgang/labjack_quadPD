@@ -81,12 +81,12 @@ def upload_to_influx(
 #         #trigger_ch_name="DIO0",
 #         trigger_name="DIO0",
 #     )
-a_scan_list_names=["AIN1","AIN3"]
+a_scan_list_names=["AIN1"]
 #x is 1 sum is 12
 lj_device = LabJackDevice(
     device_type=LabJackDeviceTypeEnum.T7,
     connection_type=LabJackConnectionTypeEnum.ETHERNET,
-    device_identifier='10.99.1.57',
+    device_identifier='192.168.1.92',
     #a_scan_list_names=a_scan_list_names,
     # scan_rate=30e3,
     # scan_duration=.6,
@@ -101,136 +101,72 @@ reference_times = {name: None for name in a_scan_list_names}
 voltage_columns = {name: [] for name in a_scan_list_names}
 
 save_interval = 1  # Save every 100 loops
-output_csv = r"C:\Users\srgang\Desktop\pulse_data\raw_profile.csv"
-stream_in = lj_device.stream_in(["AIN1","AIN3"], duration_s=.5, sampling_rate_Hz=100e3, do_trigger=True)
-for loop_index in range(5):  # number of total triggers
+output_csv = r"C:\Users\srgang\Desktop\LabJack_class\raw_profile.csv"
+stream_in = lj_device.stream_in(["AIN1"], duration_s=.2, sampling_rate_Hz=100e3, do_trigger=True)
+for loop_index in range(20000):  # number of total triggers
     print(f"Loop {loop_index}")
     import time
 
     start_time = time.perf_counter()
-    #data = device.stream_in(scan_channels= ["AIN1", "AIN3","AIN12"],duration_s = .002,sampling_rate_Hz=30e3,do_trigger=True)
+    # data = lj_device.stream_in(["AIN1"], duration_s=.1, sampling_rate_Hz=100e3, do_trigger=True)
     stream_in._stream_in()
     data = stream_in
-    print(data)
-    #print("StreamIn object:", type(data))
-    #print("dir(data):", dir(data))
-    #print('data')
-    #data = data.to_dict()
-    #print(data)
     end_time = time.perf_counter()
 
     execution_time = end_time - start_time
     print(f"Execution time: {execution_time:.4f} seconds")
-
-    #     if chan_name in ["AIN1", "AIN3"]:
-    #     # Subtract mean before valley detection
-    #         V_centered = V_raw - np.mean(V_raw)
-
-    #         # Find valleys below threshold (absolute value)
-    #         threshold = 0.002  # adjust this value as needed
-    #         valleys = find_valley_averages(t_raw, V_centered, threshold=.005)
-
-    #         # Labels to use for left-to-right valleys
-    #         labels = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
-
-    #         for i, (avg_time, avg_val) in enumerate(valleys):
-    #             if i >= len(labels):
-    #                 label = f"extra{i+1}"
-    #             else:
-    #                 label = labels[i]
-
-    #             tag_str = f"{chan_name}_{label}"
-    #             print(f"Uploading: {tag_str} with avg_val = {avg_val:.6f} at avg_time = {avg_time:.6f}")
-
-    #             try:
-    #                 upload_to_influx(
-    #                     value=avg_val,
-    #                     measurement="valley_measurement",
-    #                     field="avg_voltage",
-    #                     tag_key="channel",
-    #                     tag_value=tag_str,
-    #                     timestamp=datetime.utcnow().isoformat()
-    #                 )
-    #             except Exception as e:
-    #                 print(f"Failed to upload {chan_name} ({tag_str}): {e}")
-    #                 traceback.print_exc()
-
-    # for chan_name in a_scan_list_names:
-    #     V_raw = np.array(data.records[chan_name]['V'])  
-    #     t_raw = np.array(data.records[chan_name]['t'])
-    #     #print('t_raw')
-    #     #print(t_raw)
-    #     if chan_name in ["AIN1", "AIN3"]:
-    #         intervals = [
-    #                         (180, 286, "first"),
-    #                         (857, 908, "second"),
-    #                         (4458, 4563, "third"),
-    #                         (7992, 8045, "fourth"),
-    #                         (11198, 11250, "fifth"),
-    #                         (17683, 17788, "sixth"),
-    #                         (24415, 24520, "seventh"),
-    #                     ]
-            
-    #         # intervals = [
-    #         #                 (60, 95, "first"),
-    #         #                 (276, 292, "second"),
-    #         #                 (1474, 1510, "third"),
-    #         #                 (5633, 5669, "fourth"),
-    #         #                 (7875,7910, "fifth")
-                            
-    #         #             ]
-
-    #                     #Loop over intervals and upload
-    #         for start, end, label in intervals:
-    #             avg_val = np.mean(V_raw[start:end])
-    #             tag_str = f"{chan_name}_{label}"
-    #             print(f"Uploading: {tag_str} with avg_val = {avg_val:.6f}")
-
-    #             try:
-    #                 upload_to_influx(
-    #                     value=avg_val,
-    #                     measurement="valley_measurement",
-    #                     field="avg_voltage",
-    #                     tag_key="channel",
-    #                     tag_value=tag_str,
-    #                     timestamp=datetime.utcnow().isoformat()
-    #                 )
-    #             except Exception as e:
-    #                 print(f"Failed to upload {chan_name} ({tag_str}): {e}")
-    #                 traceback.print_exc()
     for chan_name in a_scan_list_names:
         V_raw = np.array(data.records[chan_name]['V'])  
         t_raw = np.array(data.records[chan_name]['t'])
+        avg_voltage = np.mean(V_raw)
 
-        if reference_times[chan_name] is None:
-            reference_times[chan_name] = t_raw
-        else:
-            if not np.allclose(t_raw, reference_times[chan_name], rtol=1e-6, atol=1e-9):
-                raise ValueError(f"Time for {chan_name} at loop {loop_index} does not match first sweep.")
+    # Optional: print for logging
+    print(f"Uploading average voltage {avg_voltage:.6f} for {chan_name}")
 
-        voltage_columns[chan_name].append(V_raw)
+    # Upload to InfluxDB
+    try:
+        upload_to_influx(
+            value=avg_voltage,
+            measurement="magnetometer",
+            field="millivolts",
+            tag_key="channel",
+            tag_value=chan_name,
+            timestamp=datetime.utcnow().isoformat()
+        )
+    except Exception as e:
+        print(f"Failed to upload average for {chan_name}: {e}")
+        traceback.print_exc()
 
 
 
-    if (loop_index + 1) % save_interval == 0:
-        print(f"Saving to CSV at loop {loop_index + 1}")
-        data_dict = {}
+    if reference_times[chan_name] is None:
+                reference_times[chan_name] = t_raw
+    else:
+        if not np.allclose(t_raw, reference_times[chan_name], rtol=1e-6, atol=1e-9):
+            raise ValueError(f"Time for {chan_name} at loop {loop_index} does not match first sweep.")
 
-        # Add time columns
-        for chan_name in a_scan_list_names:
-            data_dict[f"{chan_name}_t"] = reference_times[chan_name]
+    # voltage_columns[chan_name].append(V_raw)
 
-        # Use shortest length across all channels
-        min_len = min(len(voltage_columns[chan]) for chan in a_scan_list_names)
 
-        # Add voltage columns
-        for i in range(min_len):
-            for chan_name in a_scan_list_names:
-                data_dict[f"{chan_name}_V_{i}"] = voltage_columns[chan_name][i]
+    # if (loop_index + 1) % save_interval == 0:
+    #     print(f"Saving to CSV at loop {loop_index + 1}")
+    #     data_dict = {}
 
-        raw_df = pd.DataFrame(data_dict)
-        raw_df.to_csv(output_csv, index=False)
-        print(f"Saved")
+    #     # Add time columns
+    #     for chan_name in a_scan_list_names:
+    #         data_dict[f"{chan_name}_t"] = reference_times[chan_name]
+
+    #     # Use shortest length across all channels
+    #     min_len = min(len(voltage_columns[chan]) for chan in a_scan_list_names)
+
+    #     # Add voltage columns
+    #     for i in range(min_len):
+    #         for chan_name in a_scan_list_names:
+    #             data_dict[f"{chan_name}_V_{i}"] = voltage_columns[chan_name][i]
+
+    #     raw_df = pd.DataFrame(data_dict)
+    #     raw_df.to_csv(output_csv, index=False)
+    #     print(f"Saved")
 del device 
 # num_loops = 5  
 # pause_time = 1  

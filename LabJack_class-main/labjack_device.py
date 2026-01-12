@@ -62,28 +62,32 @@ class LabJackDevice:
         self._connection_type = connection_type
         self._device_identifier = device_identifier
         
+        self._handle = None
+        self._serial_number = None
+        self._IP_address = None
+        self._port = None
+        self._max_bytes_per_MB = None
+        self._device_info = None
+
         self._connect()
         print()
         print(self)
         print()
     
-    def __enter__(self) -> None:
-        """
-        Support for context manager (i.e., "with" keyword).
-        """
-        self._connect()
+    def __enter__(self):
+        if self._handle is None:
+            self._connect()
         return self
 
+
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        """
-        Ensure disconnection when used as a context manager (i.e., "with" keyword).
-        Disconnect from the LabJack device if connected when an object is about to be disposed.
-        """
-        try: 
-            self._check_connection()
-            self._disconnect()
-        except LabJackNoConnectionError:
+        # Cleanup must never raise (especially from __del__)
+        try:
+            if getattr(self, "_handle", None) is not None:
+                self._disconnect()
+        except Exception:
             pass
+
         
     def __del__(self) -> None:
         """
@@ -141,9 +145,9 @@ class LabJackDevice:
         print(f"Done. Execution time: {td_exe.total_seconds():.6f} s")
         
     def _check_connection(self) -> None:
-        if self._handle is None:
+        if getattr(self, "_handle", None) is None:
             raise LabJackNoConnectionError("LabJack connection handle is not assigned.")
-    
+
     
     def _disconnect(self) -> None:
         """
